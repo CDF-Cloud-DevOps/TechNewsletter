@@ -7,6 +7,34 @@ interface NewsletterProps {
   posts: ProcessedPost[];
 }
 
+interface PostMetricsProps {
+  score: number;
+  numComments: number;
+  url: string;
+}
+
+const PostMetrics: React.FC<PostMetricsProps> = ({ score, numComments, url }) => (
+  <div className="flex items-center gap-6 text-sm text-gray-600">
+    <div className="flex items-center gap-1">
+      <ArrowUpCircle size={16} />
+      {score.toLocaleString()}
+    </div>
+    <div className="flex items-center gap-1">
+      <MessageCircle size={16} />
+      {numComments.toLocaleString()}
+    </div>
+    <a 
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-1 text-blue-600 hover:text-blue-800"
+    >
+      <ExternalLink size={16} />
+      Source
+    </a>
+  </div>
+);
+
 const Newsletter: React.FC<NewsletterProps> = ({ posts }) => {
   const categories: Category[] = [
     'AI/ML Developments',
@@ -17,12 +45,18 @@ const Newsletter: React.FC<NewsletterProps> = ({ posts }) => {
   ];
 
   const postsByCategory = categories.reduce((acc, category) => {
-    acc[category] = posts
+    const categoryPosts = posts
       .filter(post => post.category === category)
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
+    
+    if (categoryPosts.length > 0) {
+      acc[category] = categoryPosts;
+    }
     return acc;
   }, {} as Record<Category, ProcessedPost[]>);
+
+  const nonEmptyCategories = Object.keys(postsByCategory) as Category[];
 
   return (
     <div className="max-w-4xl mx-auto p-8">
@@ -33,23 +67,25 @@ const Newsletter: React.FC<NewsletterProps> = ({ posts }) => {
         </p>
       </header>
 
-      <nav className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Table of Contents</h2>
-        <ul className="space-y-2">
-          {categories.map(category => (
-            <li key={category}>
-              <a 
-                href={`#${category}`}
-                className="text-blue-600 hover:text-blue-800"
-              >
-                {category}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      {nonEmptyCategories.length > 0 && (
+        <nav className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">Table of Contents</h2>
+          <ul className="space-y-2">
+            {nonEmptyCategories.map(category => (
+              <li key={category}>
+                <a 
+                  href={`#${category}`}
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  {category}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
 
-      {categories.map(category => (
+      {nonEmptyCategories.map(category => (
         <section key={category} id={category} className="mb-12">
           <h2 className="text-2xl font-bold mb-6 pb-2 border-b">{category}</h2>
           {postsByCategory[category].map(post => (
@@ -66,36 +102,24 @@ const Newsletter: React.FC<NewsletterProps> = ({ posts }) => {
               </h3>
               <p className="text-gray-700 mb-3">{post.summary}</p>
               
-              <div className="flex flex-wrap gap-2 mb-3">
-                {post.tags.map(tag => (
-                  <span 
-                    key={tag}
-                    className="px-2 py-1 bg-gray-100 text-sm rounded-full"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
+              {post.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {post.tags.map(tag => (
+                    <span 
+                      key={tag}
+                      className="px-2 py-1 bg-gray-100 text-sm rounded-full"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
 
-              <div className="flex items-center gap-6 text-sm text-gray-600">
-                <div className="flex items-center gap-1">
-                  <ArrowUpCircle size={16} />
-                  {post.score.toLocaleString()}
-                </div>
-                <div className="flex items-center gap-1">
-                  <MessageCircle size={16} />
-                  {post.num_comments.toLocaleString()}
-                </div>
-                <a 
-                  href={post.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-blue-600 hover:text-blue-800"
-                >
-                  <ExternalLink size={16} />
-                  Source
-                </a>
-              </div>
+              <PostMetrics 
+                score={post.score}
+                numComments={post.num_comments}
+                url={post.url}
+              />
             </article>
           ))}
         </section>
