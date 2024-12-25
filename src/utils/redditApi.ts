@@ -35,7 +35,6 @@ const SUBREDDITS = [
   'technology',
   'tech',
   'cscareerquestions',
-  'programming_discussions',
   'compsci',
   'cybersecurity',
   'netsec',
@@ -89,58 +88,39 @@ function isQualityContent(post: RedditPost): boolean {
   return hasTechnicalContent;
 }
 
-export async function fetchSubredditPosts(subreddit: string): Promise<RedditPost[]> {
-  const timestamp24HoursAgo = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
-  const url = `https://www.reddit.com/r/${subreddit}/top.json?limit=${POSTS_PER_SUBREDDIT}&t=day`;
-
+const fetchSubredditPosts = async (subreddit: string): Promise<RedditPost[]> => {
   try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const response = await fetch(
+      `https://www.reddit.com/r/${subreddit}/top.json?limit=${POSTS_PER_SUBREDDIT}&t=day`
+    );
+    
+    if (!response.ok) {
+      console.warn(`Skipping subreddit ${subreddit} due to ${response.status} error`);
+      return [];
+    }
     
     const data = await response.json();
-    
-    // Add error handling for rate limiting
-    if (data.error === 429) {
-      console.warn(`Rate limited when fetching from r/${subreddit}. Waiting before retry...`);
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return fetchSubredditPosts(subreddit);
-    }
-
     return data.data.children
-      .map((child: any) => ({
-        ...child.data,
-        subreddit: child.data.subreddit, // Ensure subreddit is included
-        domain: child.data.domain || '', // Ensure domain exists
-        created_utc: child.data.created_utc || 0 // Ensure timestamp exists
-      }))
-      .filter((post: RedditPost) => 
-        post.score >= MIN_UPVOTES &&
-        post.created_utc >= timestamp24HoursAgo &&
-        isQualityContent(post)
-      );
+      .map((child: any) => child.data)
+      .filter(isQualityContent);
   } catch (error) {
     console.error(`Error fetching posts from r/${subreddit}:`, error);
     return [];
   }
-}
+};
 
-export async function fetchAllPosts(): Promise<RedditPost[]> {
-  // Fetch in batches to avoid overwhelming Reddit's API
-  const batchSize = 5;
-  const allPosts: RedditPost[] = [];
-  
-  for (let i = 0; i < SUBREDDITS.length; i += batchSize) {
-    const batch = SUBREDDITS.slice(i, i + batchSize);
-    const batchPosts = await Promise.all(
-      batch.map(subreddit => fetchSubredditPosts(subreddit))
-    );
-    allPosts.push(...batchPosts.flat());
+const fetchAllPosts = async (): Promise<RedditPost[]> => {
+  try {
+    const allPostsPromises = SUBREDDITS.map(subreddit => fetchSubredditPosts(subreddit));
+    const allPosts = await Promise.all(allPostsPromises);
     
-    // Add a small delay between batches
-    if (i + batchSize < SUBREDDITS.length) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
+    return allPosts
+      .flat()
+      .sort((a, b) => b.score - a.score);
+  } catch (error) {
+    console.error('Error fetching all posts:', error);
+    return [];
   }
-  
-  return allPosts;
-}
+};
+
+export { fetchAllPosts, fetchSubredditPosts };

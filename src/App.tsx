@@ -1,21 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import { ProcessedPost } from './types/reddit';
-import { fetchAllPosts } from './utils/redditApi';
+import { ProcessedSubstackPost } from './types/substack';
+import { fetchAllPosts as fetchRedditPosts } from './utils/redditApi';
+import { fetchAllPosts as fetchSubstackPosts } from './utils/substackApi';
 import { processPost } from './utils/postProcessor';
 import Newsletter from './components/Newsletter';
 import { Loader2 } from 'lucide-react';
 
 function App() {
-  const [posts, setPosts] = useState<ProcessedPost[]>([]);
+  const [redditPosts, setRedditPosts] = useState<ProcessedPost[]>([]);
+  const [substackPosts, setSubstackPosts] = useState<ProcessedSubstackPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadPosts() {
       try {
-        const rawPosts = await fetchAllPosts();
-        const processedPosts = rawPosts.map(processPost);
-        setPosts(processedPosts);
+        // Fetch posts from both sources in parallel
+        const [rawRedditPosts, rawSubstackPosts] = await Promise.all([
+          fetchRedditPosts(),
+          fetchSubstackPosts()
+        ]);
+
+        setRedditPosts(rawRedditPosts.map(processPost));
+        setSubstackPosts(rawSubstackPosts);
       } catch (err) {
         setError('Failed to fetch posts. Please try again later.');
         console.error('Error loading posts:', err);
@@ -50,7 +58,10 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Newsletter posts={posts} />
+      <Newsletter 
+        redditPosts={redditPosts} 
+        substackPosts={substackPosts}
+      />
     </div>
   );
 }
